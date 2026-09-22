@@ -698,7 +698,7 @@ onMounted(async () => {
   // 1. --------- Canvas ---------
   app = new PIXI.Application()
   await app.init({
-    resizeTo: window,        
+    resizeTo: pixiContainer.value,        
     backgroundAlpha: 0, // Make transparent so CSS background shows if not loaded
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
@@ -1408,6 +1408,10 @@ onBeforeUnmount(() => {
   .left-sidebar {
     width: 100%;
     left: -100%;
+  }
+  .clear-btn-icon {
+    bottom: 90px;
+    right: 20px;
   }
 }
 </style>
