@@ -43,11 +43,21 @@
 
     <!-- Ingredients Toggle Button -->
     <button class="ingredients-toggle" @click="toggleSidebar" :title="isSidebarOpen ? 'Close Ingredients' : 'Open Ingredients'">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.27 21.73A2.5 2.5 0 0 0 5.8 22a6.9 6.9 0 0 0 5.41-2.58l.42-.51c.32-.38.7-.72 1.12-1l7.86-5.11a3.07 3.07 0 0 0 .5-4.47l-2.42-2.42a3.07 3.07 0 0 0-4.47.5L9.1 14.28c-.28.42-.62.8-1 1.12l-.51.42A6.9 6.9 0 0 0 5 21.23a2.5 2.5 0 0 0-2.73.5Z"/><path d="M12.44 9.17 14.83 6.78"/><path d="M15.5 5.5l2-2"/><path d="M18.5 8.5l2-2"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m5 11 4-7"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8c.9 0 1.8-.7 2-1.6l1.7-7.4"/>
+      </svg>
+    </button>
+
+    <!-- Ladle Button -->
+    <button :class="['ladle-toggle', { 'is-active': isLadleActive }]" @click="toggleLadle" :title="isLadleActive ? 'Put away Ladle' : 'Use Ladle'">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2v12"/>
+        <path d="M8 14a4 4 0 0 0 8 0H8z"/>
+      </svg>
     </button>
 
     <!-- Clear Button -->
-    <button class="clear-btn-icon" @click="clearSprites" title="Clear All">
+    <button :class="['clear-btn-icon', { 'is-wiggling': isDeleteWiggling }]" @click="showClearConfirm = true" title="Drag items here to delete, or click to clear all">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
     </button>
     
@@ -105,6 +115,22 @@
         >
           <img :src="`/ingredients/thumbnail/${herb.name}.png`" :alt="herb.name" draggable="false" />
           <span>{{ herb.name }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clear Confirm Modal -->
+  <div v-if="showClearConfirm" class="adjust-overlay friendly-overlay" style="z-index: 200;">
+    <div class="adjust-panel" style="max-width: 300px; text-align: center;">
+      <div class="adjust-header">
+        <h3 style="width: 100%; text-align: center;">Clear Pot</h3>
+      </div>
+      <div class="controls-group" style="padding: 25px;">
+        <p style="font-size: 1.2rem; margin-bottom: 20px;">Are you sure to clear the pot?</p>
+        <div style="display: flex; gap: 15px; justify-content: center;">
+          <button class="friendly-btn" @click="confirmClear">Yes</button>
+          <button class="friendly-btn" style="background: #a32a2a; border-color: #5c1414; box-shadow: 0 4px 0 #5c1414;" @click="showClearConfirm = false">No</button>
         </div>
       </div>
     </div>
@@ -174,6 +200,16 @@ const cropper = ref(null)
 const stencilType = ref('rectangle')
 const applyDieCut = ref(false)
 const isProcessing = ref(false)
+
+// Clear Confirm Modal
+const showClearConfirm = ref(false)
+const isDeleteWiggling = ref(false)
+
+// Ladle state
+const isLadleActive = ref(false)
+let ladleFront = null
+let ladleBack = null
+let ladleObj = { isDragging: false, lastPos: { x: 0, y: 0 }, velocity: { x: 0, y: 0 }, radius: 90, hasEvents: false }
 
 // Ingredients Sidebar
 const isSidebarOpen = ref(false)
@@ -368,12 +404,116 @@ async function tightCropBlob(blob) {
   })
 }
 
-function clearSprites() {
+function confirmClear() {
   sprites.forEach(s => {
     app.stage.removeChild(s.sprite)
-    s.sprite.destroy(true)
+    if (!s.sprite.destroyed) s.sprite.destroy()
   })
   sprites.splice(0, sprites.length)
+  showClearConfirm.value = false
+}
+
+function toggleLadle() {
+  isLadleActive.value = !isLadleActive.value
+  
+  if (isLadleActive.value) {
+    ladleFront.eventMode = 'static'
+    ladleFront.cursor = 'grab'
+    ladleBack.eventMode = 'static'
+    ladleBack.cursor = 'grab'
+    
+    if (!ladleObj.hasEvents) {
+      ladleBack.x = app.screen.width - 100
+      ladleBack.y = 350
+      ladleFront.x = app.screen.width - 100
+      ladleFront.y = 350
+    }
+    
+    ladleObj.radius = 90
+    const lr = ladleObj.radius
+    const lh = lr * 0.35 // ellipse height
+    
+    // Draw ladle back (Lowest layer of the ladle)
+    ladleBack.clear()
+    // 1. Handle (Lowest part)
+    ladleBack.moveTo(lr * 0.8, 0)
+    ladleBack.lineTo(lr * 0.9, -280)
+    ladleBack.stroke({ width: 14, color: 0xaaaaaa, cap: 'round' })
+    
+    const kappa = 0.5522848
+    const ox = lr * kappa
+    const oy = lh * kappa
+    
+    // 2. Opaque Body + Back Rim
+    ladleBack.moveTo(-lr, 0)
+    ladleBack.arc(0, 0, lr, Math.PI, 0, true) // bottom outer curve (Left to Right)
+    ladleBack.bezierCurveTo(lr, -oy, ox, -lh, 0, -lh) // back rim curve (Right to Center)
+    ladleBack.bezierCurveTo(-ox, -lh, -lr, -oy, -lr, 0) // back rim curve (Center to Left)
+    ladleBack.fill({ color: 0x555555, alpha: 1 }) 
+    ladleBack.stroke({ width: 4, color: 0xcccccc })
+    
+    // 3. Opaque Opening (Inner wall)
+    ladleBack.beginPath()
+    ladleBack.ellipse(0, 0, lr, lh)
+    ladleBack.fill({ color: 0x444444, alpha: 1 }) // Only fill, no stroke to avoid straight lines!
+    
+    // Draw ladle front
+    ladleFront.clear()
+    // Translucent Front Body (Starts at front rim, goes down to bottom curve)
+    ladleFront.moveTo(lr, 0)
+    ladleFront.bezierCurveTo(lr, oy, ox, lh, 0, lh) // front rim curve (Right to Center)
+    ladleFront.bezierCurveTo(-ox, lh, -lr, oy, -lr, 0) // front rim curve (Center to Left)
+    ladleFront.arc(0, 0, lr, Math.PI, 0, true) // bottom outer curve (Left to Right)
+    ladleFront.fill({ color: 0x777777, alpha: 0.4 }) 
+    ladleFront.stroke({ width: 4, color: 0xcccccc })
+    
+    if (!ladleObj.hasEvents) {
+      ladleObj.hasEvents = true
+      
+      const startDrag = (e) => {
+        ladleObj.isDragging = true
+        ladleFront.cursor = 'grabbing'
+        ladleBack.cursor = 'grabbing'
+        ladleObj.lastPos = { x: e.global.x, y: e.global.y }
+        ladleObj.velocity = { x: 0, y: 0 }
+      }
+      ladleFront.on('pointerdown', startDrag)
+      ladleBack.on('pointerdown', startDrag)
+      
+      const onMove = (e) => {
+        if (ladleObj.isDragging) {
+          const newPos = { x: e.global.x, y: e.global.y }
+          ladleObj.velocity.x = newPos.x - ladleObj.lastPos.x
+          ladleObj.velocity.y = newPos.y - ladleObj.lastPos.y
+          ladleFront.x += ladleObj.velocity.x
+          ladleFront.y += ladleObj.velocity.y
+          ladleBack.x = ladleFront.x
+          ladleBack.y = ladleFront.y
+          ladleObj.lastPos = newPos
+        }
+      }
+      ladleFront.on('globalpointermove', onMove)
+      ladleBack.on('globalpointermove', onMove)
+      
+      const stopLadleDrag = () => {
+        ladleObj.isDragging = false
+        ladleFront.cursor = 'grab'
+        ladleBack.cursor = 'grab'
+      }
+      ladleFront.on('pointerup', stopLadleDrag)
+      ladleFront.on('pointerupoutside', stopLadleDrag)
+      ladleFront.on('globalpointerup', stopLadleDrag)
+      ladleBack.on('pointerup', stopLadleDrag)
+      ladleBack.on('pointerupoutside', stopLadleDrag)
+      ladleBack.on('globalpointerup', stopLadleDrag)
+    }
+    
+    ladleBack.visible = true
+    ladleFront.visible = true
+  } else {
+    ladleBack.visible = false
+    ladleFront.visible = false
+  }
 }
 
 async function shareScreenshot() {
@@ -458,8 +598,8 @@ function addSpriteToCanvas(texture, dropX = null, dropY = null, scaleFactor = 1.
   
   fitSpriteToScreen(sprite, scaleFactor)
 
-  const potFrontIndex = app.stage.getChildIndex(potFront)
-  app.stage.addChildAt(sprite, potFrontIndex)
+  const insertIndex = app.stage.getChildIndex(ladleFront)
+  app.stage.addChildAt(sprite, insertIndex)
 
   const spriteObj = {
     sprite,
@@ -493,12 +633,41 @@ function addSpriteToCanvas(texture, dropX = null, dropY = null, scaleFactor = 1.
       sprite.y = newPos.y + spriteObj.dragOffset.y
       applyPhysicsConstraints(spriteObj, true)
       spriteObj.lastPos = newPos
+      
+      const clearBtn = document.querySelector('.clear-btn-icon')
+      if (clearBtn) {
+        const rect = clearBtn.getBoundingClientRect()
+        // Wiggle if dragged within 50px of the button
+        if (e.global.x >= rect.left - 50 && e.global.x <= rect.right + 50 &&
+            e.global.y >= rect.top - 50 && e.global.y <= rect.bottom + 50) {
+          isDeleteWiggling.value = true
+        } else {
+          isDeleteWiggling.value = false
+        }
+      }
     }
   })
 
-  const stopDrag = () => {
+  const stopDrag = (e) => {
+    if (!spriteObj.isDragging) return
+    
     spriteObj.isDragging = false
+    isDeleteWiggling.value = false
     sprite.cursor = 'grab'
+    
+    const clearBtn = document.querySelector('.clear-btn-icon')
+    if (clearBtn && e && e.global) {
+      const rect = clearBtn.getBoundingClientRect()
+      if (e.global.x >= rect.left && e.global.x <= rect.right &&
+          e.global.y >= rect.top && e.global.y <= rect.bottom) {
+        setTimeout(() => {
+          const index = sprites.indexOf(spriteObj)
+          if (index > -1) sprites.splice(index, 1)
+          app.stage.removeChild(sprite)
+          if (!sprite.destroyed) sprite.destroy()
+        }, 0)
+      }
+    }
   }
   sprite.on('pointerup', stopDrag)
   sprite.on('pointerupoutside', stopDrag)
@@ -719,12 +888,19 @@ onMounted(async () => {
   stove = new PIXI.Graphics()
   potBack = new PIXI.Graphics()
   water = new PIXI.Graphics()
+  ladleBack = new PIXI.Graphics()
+  ladleFront = new PIXI.Graphics()
   potFront = new PIXI.Graphics()
 
   app.stage.addChild(stove)
   app.stage.addChild(potBack)
   app.stage.addChild(water)
-  app.stage.addChild(potFront) // Front layer needs to be above sprites
+  app.stage.addChild(ladleBack) // ladleBack goes behind sprites
+  app.stage.addChild(ladleFront) // ladleFront goes in front of sprites
+  app.stage.addChild(potFront) // potFront goes above everything
+  
+  ladleBack.visible = false
+  ladleFront.visible = false
   
   // Stove Interactions
   stove.eventMode = 'static'
@@ -865,6 +1041,73 @@ onMounted(async () => {
         applyPhysicsConstraints(spriteObj, false)
       }
       
+      // Ladle collision
+      if (isLadleActive.value && ladleFront && ladleFront.visible) {
+        const lx = ladleFront.x
+        const ly = ladleFront.y
+        const lr = ladleObj.radius
+        const sr = Math.max(sprite.width, sprite.height) * 0.45
+        
+        const dx = sprite.x - lx
+        const dy = sprite.y - ly
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        
+        if (dy > 0) {
+          // 1. Inner wall collision (ONLY if the object fits comfortably inside the spoon)
+          if (sr <= lr * 0.8 && dist < lr && dist + sr > lr) {
+            const overlap = (dist + sr) - lr
+            const nx = dx / dist
+            const ny = dy / dist
+            
+            // Push towards center
+            sprite.x -= nx * overlap
+            sprite.y -= ny * overlap
+            
+            if (ladleObj.isDragging) {
+               velocity.x += (ladleObj.velocity.x - velocity.x) * 0.9
+               velocity.y += (ladleObj.velocity.y - velocity.y) * 0.9
+            } else {
+               velocity.x *= 0.5
+               velocity.y *= 0.5
+            }
+          }
+          // 2. Outer wall collision (ALWAYS apply for stirring / pushing things away)
+          else if (dist >= lr && dist - sr < lr) {
+            const overlap = lr - (dist - sr)
+            const nx = dx / dist
+            const ny = dy / dist
+            
+            // Push away from center
+            sprite.x += nx * overlap
+            sprite.y += ny * overlap
+            
+            if (ladleObj.isDragging) {
+               velocity.x += ladleObj.velocity.x * 0.8
+               velocity.y += ladleObj.velocity.y * 0.8
+            } else {
+               velocity.x += nx * 1.5
+               velocity.y += ny * 1.5
+            }
+          }
+        }
+        
+        // 3. Platform collision for HUGE objects (too big to fit inside the curved bowl)
+        if (sr > lr * 0.8 && Math.abs(dx) < lr) {
+          const spriteBottom = sprite.y + sr
+          if (spriteBottom > ly && sprite.y < ly) { 
+             // Push UP to sit on top like a lid
+             sprite.y = ly - sr
+             if (ladleObj.isDragging) {
+               velocity.y = ladleObj.velocity.y
+               velocity.x += (ladleObj.velocity.x - velocity.x) * 0.9 
+             } else {
+               if (velocity.y > 0) velocity.y *= -0.3
+               velocity.x *= 0.5 
+             }
+          }
+        }
+      }
+
       // rotation
       const targetRotation = velocity.x * 0.03
       sprite.rotation += (targetRotation - sprite.rotation) * 0.1 
@@ -1007,6 +1250,36 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 #5c4125;
 }
 
+.ladle-toggle {
+  position: absolute;
+  top: 195px;
+  right: 20px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid #5c4125;
+  color: #5c4125;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #5c4125;
+  backdrop-filter: blur(4px);
+  transition: transform 0.1s, background 0.1s;
+}
+
+.ladle-toggle.is-active {
+  background: #c09d73;
+  color: white;
+}
+
+.ladle-toggle:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #5c4125;
+}
+
 .note-toggle, .help-toggle {
   position: absolute;
   left: 20px;
@@ -1056,6 +1329,20 @@ onBeforeUnmount(() => {
   cursor: pointer;
   box-shadow: 0 4px 0 #a32a2a;
   transition: all 0.1s;
+}
+
+.clear-btn-icon:hover {
+  transform: scale(1.1);
+}
+
+.clear-btn-icon.is-wiggling {
+  animation: wiggle 0.4s ease-in-out infinite;
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg) scale(1.1); }
+  25% { transform: rotate(-10deg) scale(1.1); }
+  75% { transform: rotate(10deg) scale(1.1); }
 }
 
 .clear-btn-icon:active {
@@ -1374,6 +1661,15 @@ onBeforeUnmount(() => {
     height: 42px;
   }
   .ingredients-toggle svg {
+    width: 20px;
+    height: 20px;
+  }
+  .ladle-toggle {
+    top: 174px;
+    width: 42px;
+    height: 42px;
+  }
+  .ladle-toggle svg {
     width: 20px;
     height: 20px;
   }
