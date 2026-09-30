@@ -823,15 +823,25 @@ function applyPhysicsConstraints(spriteObj, isDrag) {
   
   if (spriteObj.isInPot) {
     if (sprite.x - halfWidth < potX - potHalfW) {
-      sprite.x = potX - potHalfW + halfWidth
-      if (!isDrag) velocity.x *= -0.8
+      if (!isDrag) {
+        sprite.x = potX - potHalfW + halfWidth
+        velocity.x *= -0.8
+      } else {
+        spriteObj.isInPot = false // Lifted out of side
+      }
     } else if (sprite.x + halfWidth > potX + potHalfW) {
-      sprite.x = potX + potHalfW - halfWidth
-      if (!isDrag) velocity.x *= -0.8
+      if (!isDrag) {
+        sprite.x = potX + potHalfW - halfWidth
+        velocity.x *= -0.8
+      } else {
+        spriteObj.isInPot = false // Lifted out of side
+      }
     }
     if (sprite.y + halfHeight > potY + potHeight) {
-      sprite.y = potY + potHeight - halfHeight
-      if (!isDrag) velocity.y *= -0.5 
+      if (!isDrag) {
+        sprite.y = potY + potHeight - halfHeight
+        velocity.y *= -0.5 
+      }
     }
     if (sprite.y + halfHeight < potY) {
       spriteObj.isInPot = false
@@ -842,19 +852,21 @@ function applyPhysicsConstraints(spriteObj, isDrag) {
       if (sprite.y < potY + potHalfH * 0.5) {
         spriteObj.isInPot = true
       } else {
-        const distLeft = Math.abs((sprite.x + halfWidth) - (potX - potHalfW))
-        const distRight = Math.abs((sprite.x - halfWidth) - (potX + potHalfW))
-        const distBottom = Math.abs((sprite.y - halfHeight) - (potY + potHeight + potHalfH))
-        const minDist = Math.min(distLeft, distRight, distBottom)
-        if (minDist === distLeft) {
-          sprite.x = potX - potHalfW - halfWidth
-          if (!isDrag) velocity.x *= -0.8
-        } else if (minDist === distRight) {
-          sprite.x = potX + potHalfW + halfWidth
-          if (!isDrag) velocity.x *= -0.8
-        } else {
-          sprite.y = potY + potHeight + potHalfH + halfHeight
-          if (!isDrag) velocity.y *= -0.8
+        if (!isDrag) {
+          const distLeft = Math.abs((sprite.x + halfWidth) - (potX - potHalfW))
+          const distRight = Math.abs((sprite.x - halfWidth) - (potX + potHalfW))
+          const distBottom = Math.abs((sprite.y - halfHeight) - (potY + potHeight + potHalfH))
+          const minDist = Math.min(distLeft, distRight, distBottom)
+          if (minDist === distLeft) {
+            sprite.x = potX - potHalfW - halfWidth
+            velocity.x *= -0.8
+          } else if (minDist === distRight) {
+            sprite.x = potX + potHalfW + halfWidth
+            velocity.x *= -0.8
+          } else {
+            sprite.y = potY + potHeight + potHalfH + halfHeight
+            velocity.y *= -0.8
+          }
         }
       }
     }
