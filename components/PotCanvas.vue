@@ -189,6 +189,7 @@ let app = null
 let PIXI = null
 const sprites = []
 const particles = []
+const activePointers = new Map()
 
 const isXrayMode = ref(false)
 
@@ -216,7 +217,9 @@ const isSidebarOpen = ref(false)
 const presetHerbs = ref([
   { name: 'galangal', maxIndex: 5 },
   { name: 'lemongrass', maxIndex: 6 },
-  { name: 'redonion', maxIndex: 5 }
+  { name: 'redonion', maxIndex: 5 },
+  { name: 'kaffirlimeleaf', maxIndex: 4 },
+  { name: 'chilli', maxIndex: 3 }
 ])
 
 // Note & Help Sidebars
@@ -290,7 +293,17 @@ async function spawnHerb(herb) {
   
   try {
     const texture = await PIXI.Assets.load(imageUrl)
-    addSpriteToCanvas(texture, null, null, 0.50) // sprite spawn scale = 50%
+    
+    let scaleFactor = 0.60
+    if (herb.name === 'galangal' || herb.name === 'redonion') {
+      scaleFactor = 0.40
+    } else if (herb.name === 'lemongrass') {
+      scaleFactor = 0.45
+    } else if (herb.name === 'kaffirlimeleaf') {
+      scaleFactor = 0.55
+    }
+    
+    addSpriteToCanvas(texture, null, null, scaleFactor, herb.name)
   } catch (e) {
     console.error('Failed to load herb sprite', e)
   }
@@ -411,6 +424,10 @@ function confirmClear() {
   })
   sprites.splice(0, sprites.length)
   showClearConfirm.value = false
+  
+  chilliBoilTime = 0
+  currentWaterColor = 0x0088cc
+  drawWater()
 }
 
 function toggleLadle() {
@@ -560,6 +577,21 @@ let potHalfW = 0
 let potHalfH = 0
 let stoveHeight = 0
 
+let chilliBoilTime = 0
+const MAX_CHILLI_BOIL_TIME = 20000
+let currentWaterColor = 0x0088cc
+
+function drawWater() {
+  if (!water) return
+  const waterY = potY + potHalfH * 0.4 
+  const waterHalfW = potHalfW * 0.95 
+  const waterHalfH = potHalfH * 0.95
+  
+  water.clear()
+  water.ellipse(potX, waterY, waterHalfW, waterHalfH)
+  water.fill({ color: currentWaterColor, alpha: isXrayMode.value ? 0.6 : 1 }) 
+}
+
 function resizeBackground() {
   if (!bgSprite || !app) return
   const scaleX = app.screen.width / bgSprite.texture.width
@@ -574,7 +606,7 @@ function resizeBackground() {
 function fitSpriteToScreen(targetSprite, scaleFactor = 1.0) {
   if (!targetSprite || !targetSprite.texture || !app) return
   const screenMin = Math.min(app.screen.width, app.screen.height)
-  const targetSize = Math.max(120, Math.min(220, screenMin * 0.25)) * scaleFactor
+  const targetSize = Math.max(60, Math.min(180, screenMin * 0.18)) * scaleFactor
   const maxTextureDim = Math.max(targetSprite.texture.width, targetSprite.texture.height)
   if (maxTextureDim > 0) {
     const scale = targetSize / maxTextureDim
@@ -582,7 +614,7 @@ function fitSpriteToScreen(targetSprite, scaleFactor = 1.0) {
   }
 }
 
-function addSpriteToCanvas(texture, dropX = null, dropY = null, scaleFactor = 1.0) {
+function addSpriteToCanvas(texture, dropX = null, dropY = null, scaleFactor = 1.0, type = 'custom') {
   if (!app || !PIXI) return
 
   const sprite = new PIXI.Sprite(texture)
@@ -603,55 +635,92 @@ function addSpriteToCanvas(texture, dropX = null, dropY = null, scaleFactor = 1.
 
   const spriteObj = {
     sprite,
+    type,
     velocity: { x: 0, y: 0 },
     isInPot: false,
     isDragging: false,
     lastPos: { x: 0, y: 0 },
-    dragOffset: { x: 0, y: 0 }
+    dragOffset: { x: 0, y: 0 },
+    baseRotation: 0
   }
 
   sprite.eventMode = 'static'
   sprite.cursor = 'grab'
 
   sprite.on('pointerdown', (e) => {
-    spriteObj.isDragging = true
-    sprite.cursor = 'grabbing'
-    spriteObj.lastPos = { x: e.global.x, y: e.global.y }
-    spriteObj.dragOffset = { 
-      x: sprite.x - e.global.x, 
-      y: sprite.y - e.global.y 
+    activePointers.set(e.pointerId, { x: e.global.x, y: e.global.y })
+    
+    if (!spriteObj.isDragging) {
+      spriteObj.isDragging = true
+      spriteObj.primaryPointerId = e.pointerId
+      sprite.cursor = 'grabbing'
+      spriteObj.lastPos = { x: e.global.x, y: e.global.y }
+      spriteObj.dragOffset = { 
+        x: sprite.x - e.global.x, 
+        y: sprite.y - e.global.y 
+      }
+      spriteObj.velocity = { x: 0, y: 0 } 
+      spriteObj.lastAngle = undefined
     }
-    spriteObj.velocity = { x: 0, y: 0 } 
   })
 
   sprite.on('globalpointermove', (e) => {
     if (spriteObj.isDragging) {
-      const newPos = { x: e.global.x, y: e.global.y }
-      spriteObj.velocity.x = newPos.x - spriteObj.lastPos.x
-      spriteObj.velocity.y = newPos.y - spriteObj.lastPos.y
-      sprite.x = newPos.x + spriteObj.dragOffset.x
-      sprite.y = newPos.y + spriteObj.dragOffset.y
-      applyPhysicsConstraints(spriteObj, true)
-      spriteObj.lastPos = newPos
+      if (activePointers.has(e.pointerId)) {
+        activePointers.set(e.pointerId, { x: e.global.x, y: e.global.y })
+      }
+
+      const isRightClick = e.buttons !== undefined && (e.buttons & 2)
+      const pointers = Array.from(activePointers.values())
       
-      const clearBtn = document.querySelector('.clear-btn-icon')
-      if (clearBtn) {
-        const rect = clearBtn.getBoundingClientRect()
-        // Wiggle if dragged within 50px of the button
-        if (e.global.x >= rect.left - 50 && e.global.x <= rect.right + 50 &&
-            e.global.y >= rect.top - 50 && e.global.y <= rect.bottom + 50) {
-          isDeleteWiggling.value = true
-        } else {
-          isDeleteWiggling.value = false
+      if (isRightClick || pointers.length >= 2) {
+        let angle = 0
+        if (pointers.length >= 2) {
+          angle = Math.atan2(pointers[1].y - pointers[0].y, pointers[1].x - pointers[0].x)
+        } else if (isRightClick) {
+          angle = Math.atan2(e.global.y - sprite.y, e.global.x - sprite.x)
+        }
+        
+        if (spriteObj.lastAngle !== undefined) {
+          let diff = angle - spriteObj.lastAngle
+          if (diff > Math.PI) diff -= Math.PI * 2
+          if (diff < -Math.PI) diff += Math.PI * 2
+          spriteObj.baseRotation += diff
+        }
+        spriteObj.lastAngle = angle
+      } else {
+        spriteObj.lastAngle = undefined
+        
+        if (e.pointerId === spriteObj.primaryPointerId) {
+          const newPos = { x: e.global.x, y: e.global.y }
+          spriteObj.velocity.x = newPos.x - spriteObj.lastPos.x
+          spriteObj.velocity.y = newPos.y - spriteObj.lastPos.y
+          sprite.x = newPos.x + spriteObj.dragOffset.x
+          sprite.y = newPos.y + spriteObj.dragOffset.y
+          applyPhysicsConstraints(spriteObj, true)
+          spriteObj.lastPos = newPos
+          
+          const clearBtn = document.querySelector('.clear-btn-icon')
+          if (clearBtn) {
+            const rect = clearBtn.getBoundingClientRect()
+            if (e.global.x >= rect.left - 50 && e.global.x <= rect.right + 50 &&
+                e.global.y >= rect.top - 50 && e.global.y <= rect.bottom + 50) {
+              isDeleteWiggling.value = true
+            } else {
+              isDeleteWiggling.value = false
+            }
+          }
         }
       }
     }
   })
 
   const stopDrag = (e) => {
-    if (!spriteObj.isDragging) return
+    activePointers.delete(e.pointerId)
+    if (!spriteObj.isDragging || e.pointerId !== spriteObj.primaryPointerId) return
     
     spriteObj.isDragging = false
+    spriteObj.lastAngle = undefined
     isDeleteWiggling.value = false
     sprite.cursor = 'grab'
     
@@ -757,13 +826,7 @@ function drawPot() {
   potBack.stroke({ width: 6, color: 0xaaaaaa })
   
   // 2. Water
-  const waterY = potY + potHalfH * 0.4 
-  const waterHalfW = potHalfW * 0.95 
-  const waterHalfH = potHalfH * 0.95
-  
-  water.clear()
-  water.ellipse(potX, waterY, waterHalfW, waterHalfH)
-  water.fill({ color: 0x0088cc, alpha: isXrayMode.value ? 0.6 : 1 }) 
+  drawWater()
   
   // 3. Front Body
   potFront.clear()
@@ -885,6 +948,18 @@ onMounted(async () => {
     autoDensity: true,
   })
   pixiContainer.value.appendChild(app.canvas)
+  pixiContainer.value.addEventListener('contextmenu', e => e.preventDefault())
+
+  app.stage.eventMode = 'static'
+  app.stage.hitArea = new PIXI.Rectangle(-10000, -10000, 20000, 20000)
+  app.stage.on('pointerdown', e => activePointers.set(e.pointerId, { x: e.global.x, y: e.global.y }))
+  app.stage.on('pointerup', e => activePointers.delete(e.pointerId))
+  app.stage.on('pointerupoutside', e => activePointers.delete(e.pointerId))
+  app.stage.on('globalpointermove', e => {
+    if (activePointers.has(e.pointerId)) {
+      activePointers.set(e.pointerId, { x: e.global.x, y: e.global.y })
+    }
+  })
 
   // Load and add background first
   try {
@@ -910,6 +985,10 @@ onMounted(async () => {
   app.stage.addChild(ladleBack) // ladleBack goes behind sprites
   app.stage.addChild(ladleFront) // ladleFront goes in front of sprites
   app.stage.addChild(potFront) // potFront goes above everything
+  
+  potFront.eventMode = 'none'
+  potBack.eventMode = 'none'
+  water.eventMode = 'none'
   
   ladleBack.visible = false
   ladleFront.visible = false
@@ -1121,9 +1200,31 @@ onMounted(async () => {
       }
 
       // rotation
-      const targetRotation = velocity.x * 0.03
+      if (isInPot && isBoiling.value && sprite.y > potY - 20) {
+        spriteObj.baseRotation += (Math.random() - 0.5) * 0.05
+      }
+      const targetRotation = spriteObj.baseRotation + velocity.x * 0.03
       sprite.rotation += (targetRotation - sprite.rotation) * 0.1 
     })
+
+    // Chilli tinting logic
+    let hasChilliInBoilingWater = false
+    if (isBoiling.value) {
+      hasChilliInBoilingWater = sprites.some(s => s.type === 'chilli' && s.isInPot && s.sprite.y > potY - 20)
+    }
+    if (hasChilliInBoilingWater) {
+      chilliBoilTime = Math.min(MAX_CHILLI_BOIL_TIME, chilliBoilTime + ticker.deltaMS)
+    }
+    const progress = chilliBoilTime / MAX_CHILLI_BOIL_TIME
+    const r = Math.floor(0 + (120 - 0) * progress)
+    const g = Math.floor(136 + (160 - 136) * progress)
+    const b = Math.floor(204 + (100 - 204) * progress)
+    const newWaterColor = (r << 16) + (g << 8) + b
+    
+    if (currentWaterColor !== newWaterColor) {
+      currentWaterColor = newWaterColor
+      drawWater()
+    }
   })
 
   handleResize = () => {
