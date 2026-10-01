@@ -1540,6 +1540,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Custom scrollbar for herbs list */
@@ -1595,6 +1597,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 15px;
   color: #5c4125;
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Scrollbar styles for sidebar-content */
