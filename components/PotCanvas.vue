@@ -294,13 +294,13 @@ async function spawnHerb(herb) {
   try {
     const texture = await PIXI.Assets.load(imageUrl)
     
-    let scaleFactor = 0.60
+    let scaleFactor = 0.80
     if (herb.name === 'galangal' || herb.name === 'redonion') {
-      scaleFactor = 0.40
+      scaleFactor = 0.50
     } else if (herb.name === 'lemongrass') {
-      scaleFactor = 0.45
-    } else if (herb.name === 'kaffirlimeleaf') {
       scaleFactor = 0.55
+    } else if (herb.name === 'kaffirlimeleaf') {
+      scaleFactor = 1
     }
     
     addSpriteToCanvas(texture, null, null, scaleFactor, herb.name)
