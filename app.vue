@@ -1,7 +1,7 @@
 <template>
   <ClientOnly>
     <Head>
-      <Meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+      <Meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
     </Head>
     <PotCanvas />
   </ClientOnly>
@@ -15,6 +15,7 @@ html, body {
   padding: 0;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   font-family: 'Mali', cursive, sans-serif;
   background-color: #f4dcb9; /* fallback background */

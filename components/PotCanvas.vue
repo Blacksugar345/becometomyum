@@ -1254,6 +1254,7 @@ onBeforeUnmount(() => {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   touch-action: none;
   background-color: #f4dcb9; /* Fallback */
   user-select: none;
@@ -1427,8 +1428,8 @@ onBeforeUnmount(() => {
 
 .clear-btn-icon {
   position: absolute;
-  bottom: 25px;
-  right: 25px;
+  bottom: calc(25px + env(safe-area-inset-bottom, 0px));
+  right: calc(25px + env(safe-area-inset-right, 0px));
   z-index: 10;
   background: #ff6b6b;
   color: white;
