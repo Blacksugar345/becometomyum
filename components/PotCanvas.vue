@@ -606,7 +606,7 @@ function resizeBackground() {
 function fitSpriteToScreen(targetSprite, scaleFactor = 1.0) {
   if (!targetSprite || !targetSprite.texture || !app) return
   const screenMin = Math.min(app.screen.width, app.screen.height)
-  const targetSize = Math.max(60, Math.min(180, screenMin * 0.18)) * scaleFactor
+  const targetSize = Math.max(120, Math.min(220, screenMin * 0.25)) * scaleFactor
   const maxTextureDim = Math.max(targetSprite.texture.width, targetSprite.texture.height)
   if (maxTextureDim > 0) {
     const scale = targetSize / maxTextureDim
